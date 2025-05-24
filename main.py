@@ -128,12 +128,30 @@ class SnapManager:
         for other in cls.windows:
             if other is win:
                 continue
-            dx = other.x() - (win.x() + win.width())
-            if abs(dx) <= SNAP_DISTANCE:
-                if abs(other.y() - win.y()) <= SNAP_DISTANCE:
-                    win.move(other.x() - win.width(), other.y())
-                    win.snapped_to.append(other)
-                    break
+            # snap right edge of win to left edge of other
+            if abs(other.x() - (win.x() + win.width())) <= SNAP_DISTANCE and \
+               abs(other.y() - win.y()) <= SNAP_DISTANCE:
+                win.move(other.x() - win.width(), other.y())
+                win.snapped_to.append(other)
+                return
+            # snap left edge of win to right edge of other
+            if abs(win.x() - (other.x() + other.width())) <= SNAP_DISTANCE and \
+               abs(other.y() - win.y()) <= SNAP_DISTANCE:
+                win.move(other.x() + other.width(), other.y())
+                win.snapped_to.append(other)
+                return
+            # snap top edge
+            if abs(win.y() - (other.y() + other.height())) <= SNAP_DISTANCE and \
+               abs(other.x() - win.x()) <= SNAP_DISTANCE:
+                win.move(other.x(), other.y() + other.height())
+                win.snapped_to.append(other)
+                return
+            # snap bottom edge
+            if abs(other.y() - (win.y() + win.height())) <= SNAP_DISTANCE and \
+               abs(other.x() - win.x()) <= SNAP_DISTANCE:
+                win.move(other.x(), other.y() - win.height())
+                win.snapped_to.append(other)
+                return
 
 
 class DataWorker(QtCore.QThread):
@@ -174,15 +192,47 @@ class ControlPanel(QtWidgets.QWidget):
         super().__init__()
         self.setWindowTitle("Control Panel")
         self.layout = QtWidgets.QVBoxLayout(self)
+
         self.add_btn = QtWidgets.QPushButton("Add Meter")
         self.add_btn.clicked.connect(self.add_meter)
         self.layout.addWidget(self.add_btn)
+
+        self.snap_btn = QtWidgets.QPushButton("Toggle Snap (Ctrl+U)")
+        self.snap_btn.setCheckable(True)
+        self.snap_btn.setChecked(True)
+        self.snap_btn.clicked.connect(self.toggle_snap)
+        self.layout.addWidget(self.snap_btn)
+
+        self.top_btn = QtWidgets.QPushButton("Always On Top (Ctrl+Shift+T)")
+        self.top_btn.setCheckable(True)
+        self.top_btn.setChecked(True)
+        self.top_btn.clicked.connect(self.toggle_top)
+        self.layout.addWidget(self.top_btn)
+
         self.meters = []
         self.add_meter()
+
+        QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+U"), self, activated=self.toggle_snap)
+        QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+T"), self, activated=self.toggle_top)
+
+    def toggle_snap(self):
+        SnapManager.toggle()
+        self.snap_btn.setChecked(SnapManager.enabled)
+
+    def toggle_top(self):
+        for m in self.meters:
+            flags = m.windowFlags()
+            if self.top_btn.isChecked():
+                m.setWindowFlags(flags | QtCore.Qt.WindowStaysOnTopHint)
+            else:
+                m.setWindowFlags(flags & ~QtCore.Qt.WindowStaysOnTopHint)
+            m.show()
 
     def add_meter(self):
         meter = PowerMeter()
         SnapManager.add(meter)
+        if self.top_btn.isChecked():
+            meter.setWindowFlags(meter.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
         meter.show()
         meter.start_stream("SPX")
         self.meters.append(meter)
