@@ -212,8 +212,8 @@ class ControlPanel(QtWidgets.QWidget):
         self.meters = []
         self.add_meter()
 
-        QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+U"), self, activated=self.toggle_snap)
-        QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+T"), self, activated=self.toggle_top)
+        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+U"), self, activated=self.toggle_snap)
+        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+T"), self, activated=self.toggle_top)
 
     def toggle_snap(self):
         SnapManager.toggle()
