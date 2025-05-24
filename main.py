@@ -114,6 +114,7 @@ class PowerMeter(QtWidgets.QWidget):
         self.sell_total = 0
         self.inverted = False
         self.auto_reset = False
+        self.flash_enabled = True
         self.flash_color = QtGui.QColor("#00BFFF")
         self.main_tick_width = 2
         self.half_tick_width = 1
@@ -219,6 +220,8 @@ class PowerMeter(QtWidgets.QWidget):
         self.sell_total = 0
         self.update_labels()
         self.canvas.update()
+        if self.flash_enabled:
+            self.flash()
 
     def _reset_all(self, *args):
         for m in SnapManager.windows:
@@ -256,7 +259,6 @@ class PowerMeter(QtWidgets.QWidget):
         self.canvas.update()
         if self.auto_reset and self.buy_total == self.sell_total and self.buy_total != 0:
             self.reset()
-            self.flash()
 
     def closeEvent(self, event):
         if self.worker:
@@ -386,6 +388,7 @@ class ControlPanel(QtWidgets.QWidget):
         super().__init__()
         self.setWindowTitle("Control Panel")
         self.cfg = load_config()
+        SnapManager.enabled = self.cfg.get("snap_enabled", True)
         self.layout = QtWidgets.QVBoxLayout(self)
 
         self.add_btn = QtWidgets.QPushButton("Add Meter")
@@ -412,7 +415,7 @@ class ControlPanel(QtWidgets.QWidget):
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+R"), self, activated=self.reset_focused)
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+R"), self, activated=self.reset_all)
         QtGui.QShortcut(QtGui.QKeySequence("Ctrl+T"), self, activated=self.set_template)
-        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Alt+T"), self, activated=self.resize_all)
+        QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Shift+T"), self, activated=self.resize_all)
 
     def toggle_snap(self):
         SnapManager.toggle()
@@ -437,6 +440,12 @@ class ControlPanel(QtWidgets.QWidget):
         meter.start_stream("SPX")
         self.meters.append(meter)
 
+    def _active_meter(self):
+        win = QtWidgets.QApplication.activeWindow()
+        if isinstance(win, PowerMeter):
+            return win
+        return self.meters[-1] if self.meters else None
+
     def closeEvent(self, event):
         self.cfg["snap_enabled"] = SnapManager.enabled
         self.cfg["always_on_top"] = self.top_btn.isChecked()
@@ -444,16 +453,18 @@ class ControlPanel(QtWidgets.QWidget):
         return super().closeEvent(event)
 
     def reset_focused(self):
-        if self.meters:
-            self.meters[-1].reset()
+        meter = self._active_meter()
+        if meter:
+            meter.reset()
 
     def reset_all(self):
         for m in self.meters:
             m.reset()
 
     def set_template(self):
-        if self.meters:
-            self._template_size = self.meters[-1].size()
+        meter = self._active_meter()
+        if meter:
+            self._template_size = meter.size()
 
     def resize_all(self):
         if hasattr(self, "_template_size"):
