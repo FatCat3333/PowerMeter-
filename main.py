@@ -1,5 +1,11 @@
 import sys
 from PySide6 import QtWidgets, QtCore, QtGui
+import asyncio
+try:
+    from tastytrade.dxfeed import DXLinkStreamer, OptionSale
+except ImportError:  # tastytrade not installed; placeholders for type checkers
+    DXLinkStreamer = object
+    OptionSale = object
 
 SNAP_DISTANCE = 10
 
@@ -10,6 +16,8 @@ class PowerMeter(QtWidgets.QWidget):
         self.setMinimumSize(40, 150)
         self._setup_ui()
         self.snapped_to = []
+        self.symbol = "SPX"
+        self.worker = None
 
     def _setup_ui(self):
         self.strike_edit = QtWidgets.QLineEdit("5900")
@@ -54,12 +62,41 @@ class PowerMeter(QtWidgets.QWidget):
         self.header.setStyleSheet("background-color:#333; color:white")
         self.canvas = QtWidgets.QFrame()
         self.canvas.setStyleSheet("background-color:#202020")
+        canvas_layout = QtWidgets.QVBoxLayout(self.canvas)
+        canvas_layout.setContentsMargins(2, 2, 2, 2)
+        canvas_layout.setSpacing(0)
+        self.buy_label = QtWidgets.QLabel("0")
+        self.buy_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.buy_label.setStyleSheet("color:white")
+        self.sell_label = QtWidgets.QLabel("0")
+        self.sell_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.sell_label.setStyleSheet("color:white")
+        canvas_layout.addWidget(self.buy_label)
+        canvas_layout.addWidget(self.sell_label)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self.header)
         layout.addWidget(self.canvas, 1)
+
+    def start_stream(self, symbol):
+        self.symbol = symbol
+        if self.worker:
+            self.worker.stop()
+        self.worker = DataWorker(symbol)
+        self.worker.data.connect(self.update_totals)
+        self.worker.start()
+
+    @QtCore.Slot(int, int)
+    def update_totals(self, buys, sells):
+        self.buy_label.setText(str(buys))
+        self.sell_label.setText(str(sells))
+
+    def closeEvent(self, event):
+        if self.worker:
+            self.worker.stop()
+        return super().closeEvent(event)
 
     def moveEvent(self, event):
         super().moveEvent(event)
@@ -98,6 +135,40 @@ class SnapManager:
                     win.snapped_to.append(other)
                     break
 
+
+class DataWorker(QtCore.QThread):
+    data = QtCore.Signal(int, int)
+
+    def __init__(self, symbol):
+        super().__init__()
+        self.symbol = symbol
+        self.buy_total = 0
+        self.sell_total = 0
+        self._running = True
+
+    async def _run_async(self):
+        if DXLinkStreamer is object:
+            return
+        streamer = DXLinkStreamer()
+        await streamer.login()
+        await streamer.add_option_sales(self.symbol)
+        async for sale in streamer.listen():
+            if not self._running:
+                break
+            side = getattr(sale, "event_type", "")
+            size = getattr(sale, "size", 0)
+            if side == "B" or getattr(sale, "is_buy", False):
+                self.buy_total += int(size)
+            else:
+                self.sell_total += int(size)
+            self.data.emit(self.buy_total, self.sell_total)
+
+    def run(self):
+        asyncio.run(self._run_async())
+
+    def stop(self):
+        self._running = False
+
 class ControlPanel(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -113,6 +184,7 @@ class ControlPanel(QtWidgets.QWidget):
         meter = PowerMeter()
         SnapManager.add(meter)
         meter.show()
+        meter.start_stream("SPX")
         self.meters.append(meter)
 
 if __name__ == "__main__":
