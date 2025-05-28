@@ -103,7 +103,8 @@ class PowerMeter(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Window)
-        self.setMinimumSize(40, 150)
+        # allow a narrower window by reducing the minimum width
+        self.setMinimumSize(20, 150)
         self._setup_ui()
         # track neighbours this window is snapped to and the side of attachment
         # e.g. {other_window: "left"}
