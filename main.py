@@ -155,10 +155,10 @@ class PowerMeter(QtWidgets.QWidget):
         self.invert_btn.clicked.connect(self.toggle_invert)
 
         side_layout = QtWidgets.QVBoxLayout()
-        side_layout.setContentsMargins(0, 0, 0, 0)
+        # move the reset button down by two pixels
+        side_layout.setContentsMargins(0, 2, 0, 0)
         side_layout.setSpacing(1)
         side_layout.addWidget(self.reset_btn)
-        side_layout.addWidget(self.invert_btn)
 
         header_layout = QtWidgets.QHBoxLayout()
         header_layout.setContentsMargins(2, 2, 2, 2)
@@ -168,6 +168,10 @@ class PowerMeter(QtWidgets.QWidget):
         header_left.setSpacing(0)
         header_left.addLayout(strike_layout)
         header_left.addWidget(self.call_put_btn)
+        # place the invert button on the same x-axis as the call button,
+        # offset downward slightly
+        header_left.addSpacing(1)
+        header_left.addWidget(self.invert_btn)
 
         header_layout.addLayout(header_left)
         header_layout.addStretch()
