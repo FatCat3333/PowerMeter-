@@ -156,7 +156,7 @@ class PowerMeter(QtWidgets.QWidget):
 
         side_layout = QtWidgets.QVBoxLayout()
         side_layout.setContentsMargins(0, 0, 0, 0)
-        side_layout.setSpacing(2)
+        side_layout.setSpacing(1)
         side_layout.addWidget(self.reset_btn)
         side_layout.addWidget(self.invert_btn)
 
