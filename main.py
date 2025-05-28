@@ -297,53 +297,87 @@ class SnapManager:
 
     @classmethod
     def check_snap(cls, win):
+        """Snap *win* to any nearby windows on all sides.
+
+        Multiple neighbours may be attached at once. Existing attachments are
+        cleared if the windows are moved away from each other."""
         if not cls.enabled:
             return
+
+        gx, gy, gw, gh = win.geometry().getRect()
+        # remove relations that are no longer close enough
+        for other in list(win.snapped_to.keys()):
+            if other not in cls.windows:
+                win.snapped_to.pop(other, None)
+                continue
+            ox, oy, ow, oh = other.geometry().getRect()
+            if not (
+                abs((gx + gw) - ox) <= SNAP_DISTANCE
+                or abs(gx - (ox + ow)) <= SNAP_DISTANCE
+                or abs(gy - (oy + oh)) <= SNAP_DISTANCE
+                or abs((gy + gh) - oy) <= SNAP_DISTANCE
+            ):
+                win.snapped_to.pop(other, None)
+                other.snapped_to.pop(win, None)
+
         for other in cls.windows:
             if other is win:
                 continue
-            gx, gy, gw, gh = win.geometry().getRect()
             ox, oy, ow, oh = other.geometry().getRect()
+
             # snap right edge of win to left edge of other
             if abs((gx + gw) - ox) <= SNAP_DISTANCE and abs(gy - oy) <= SNAP_DISTANCE:
                 win.move(ox - gw, oy)
                 win.snapped_to[other] = "right"
                 other.snapped_to[win] = "left"
-                return
+                gx, gy = ox - gw, oy  # update geometry for further checks
+
             # snap left edge of win to right edge of other
             if abs(gx - (ox + ow)) <= SNAP_DISTANCE and abs(gy - oy) <= SNAP_DISTANCE:
                 win.move(ox + ow, oy)
                 win.snapped_to[other] = "left"
                 other.snapped_to[win] = "right"
-                return
+                gx, gy = ox + ow, oy
+
             # snap top edge of win to bottom edge of other
             if abs(gy - (oy + oh)) <= SNAP_DISTANCE and abs(gx - ox) <= SNAP_DISTANCE:
                 win.move(ox, oy + oh)
                 win.snapped_to[other] = "top"
                 other.snapped_to[win] = "bottom"
-                return
+                gx, gy = ox, oy + oh
+
             # snap bottom edge of win to top edge of other
             if abs((gy + gh) - oy) <= SNAP_DISTANCE and abs(gx - ox) <= SNAP_DISTANCE:
                 win.move(ox, oy - gh)
                 win.snapped_to[other] = "bottom"
                 other.snapped_to[win] = "top"
-                return
+                gx, gy = ox, oy - gh
 
     @classmethod
     def propagate(cls, source):
+        """Propagate *source* window movement to all connected windows."""
         if cls.propagating:
             return
         cls.propagating = True
         try:
-            for other, rel in source.snapped_to.items():
-                if rel == "right":
-                    other.move(source.x() + source.width(), source.y())
-                elif rel == "left":
-                    other.move(source.x() - other.width(), source.y())
-                elif rel == "top":
-                    other.move(source.x(), source.y() + source.height())
-                elif rel == "bottom":
-                    other.move(source.x(), source.y() - other.height())
+            visited = set()
+            queue = [source]
+            while queue:
+                win = queue.pop(0)
+                if win in visited:
+                    continue
+                visited.add(win)
+                for other, rel in win.snapped_to.items():
+                    if rel == "right":
+                        other.move(win.x() + win.width(), win.y())
+                    elif rel == "left":
+                        other.move(win.x() - other.width(), win.y())
+                    elif rel == "top":
+                        other.move(win.x(), win.y() + win.height())
+                    elif rel == "bottom":
+                        other.move(win.x(), win.y() - other.height())
+                    if other not in visited:
+                        queue.append(other)
         finally:
             cls.propagating = False
 
