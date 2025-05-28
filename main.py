@@ -148,7 +148,7 @@ class PowerMeter(QtWidgets.QWidget):
         self.reset_btn.setFixedSize(20, 20)
         self.reset_btn.clicked.connect(self.reset)
         self.reset_btn.setStyleSheet("background:#1E74D2;color:white")
-        self.invert_btn = QtWidgets.QPushButton("\u2195")
+        self.invert_btn = QtWidgets.QPushButton("\u25BC")
         self.invert_btn.setFixedSize(20, 20)
         self.invert_btn.setStyleSheet("background:#808080;color:white")
         self.invert_btn.clicked.connect(self.toggle_invert)
@@ -208,8 +208,10 @@ class PowerMeter(QtWidgets.QWidget):
         self.inverted = not self.inverted
         if self.inverted:
             self.invert_btn.setStyleSheet("background:#E3A300;color:white")
+            self.invert_btn.setText("\u25B2")
         else:
             self.invert_btn.setStyleSheet("background:#808080;color:white")
+            self.invert_btn.setText("\u25BC")
         self.canvas.update()
 
     def stack_number(self, value):
